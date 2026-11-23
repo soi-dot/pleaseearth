@@ -1,0 +1,762 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>해수 밀도 탐구실 · TEOS-10</title>
+<meta name="description" content="TEOS-10의 공식 75항 비체적 다항식으로 해수 밀도와 밀도 유지 조건을 계산합니다.">
+<style>
+  :root {
+    color-scheme: light;
+    --ink: #132d41;
+    --muted: #446075;
+    --teal: #006969;
+    --teal-dark: #005653;
+    --line: #cfdde5;
+    --paper: #fff;
+    --page: #eff5f8;
+    --navy: #072c43;
+    --number: ui-monospace, SFMono-Regular, Consolas, monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font: 1rem/1.6 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    color: var(--ink);
+    background: var(--page);
+    overflow-wrap: break-word;
+  }
+  h1, h2, h3, p { margin: 0; }
+  h1, h2, h3 { line-height: 1.25; letter-spacing: -.035em; }
+  h1 { font-size: clamp(2.3rem, 6vw, 4.15rem); }
+  h2 { font-size: clamp(1.45rem, 3vw, 1.85rem); }
+  h3 { font-size: 1.15rem; }
+  .wrap { width: min(1100px, calc(100% - 48px)); margin-inline: auto; }
+  .hero { background: linear-gradient(116deg, #082b43 18%, #0c4958 100%); color: white; padding: 46px 0 39px; }
+  .hero-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, .58fr); gap: 28px; align-items: center; }
+  .course { color: #a9e3df; font-size: .9rem; font-weight: 700; margin-bottom: 8px; }
+  .intro { margin-top: 12px; color: #e0edf2; }
+  .readout { border: 1px solid #7eafb970; border-radius: 15px; padding: 14px 19px; background: #082e4380; }
+  .readout-label, .readout-unit { color: #cfebed; font-size: .92rem; }
+  output { display: block; font: 650 clamp(1.6rem, 4vw, 2.55rem)/1.22 var(--number); margin: 2px 0; }
+  .jump { background: #fff; border-bottom: 1px solid var(--line); }
+  .jump .wrap { display: flex; flex-wrap: wrap; gap: 0 24px; }
+  .jump a { display: inline-flex; align-items: center; min-height: 48px; color: var(--teal-dark); font-weight: 680; text-decoration: none; }
+  .jump a:hover { text-decoration: underline; }
+  main { padding-block: 24px 28px; display: grid; gap: 18px; }
+  .panel { background: white; border: 1px solid var(--line); border-radius: 16px; padding: clamp(16px, 3vw, 30px); min-width: 0; }
+  .section-title { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; }
+  .section-letter { color: var(--teal-dark); background: #e0f3f0; border-radius: 7px; font: 700 .95rem/1.1 var(--number); padding: 7px 9px; }
+  .controls { display: grid; gap: 12px; margin-top: 15px; align-items: end; }
+  .base-controls { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .two-inputs { grid-template-columns: repeat(2, minmax(0, 220px)); }
+  .one-input { grid-template-columns: minmax(0, 220px); }
+  label { font-size: .95rem; font-weight: 700; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .unit { font-weight: 450; color: var(--muted); }
+  input { width: 100%; color: var(--ink); background: #f7fafb; border: 1px solid #9eb4c3; border-radius: 8px; min-height: 46px; padding: 8px 10px; font: 1rem/1.3 var(--number); }
+  input[aria-invalid="true"] { border: 2px solid #9e2d26; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+  button { line-height: 1.3; font-family: inherit; font-size: .95rem; font-weight: 700; padding: 8px 14px; min-height: 44px; border: 1px solid transparent; border-radius: 8px; background: var(--teal); color: white; cursor: pointer; }
+  button:hover { background: var(--teal-dark); }
+  button.alt { border-color: #a8c5c7; background: #f3fafa; color: var(--teal-dark); }
+  button.alt:hover { background: #e1f3f0; }
+  button:disabled { opacity: .57; cursor: default; }
+  :focus-visible { outline: 3px solid #236dce; outline-offset: 3px; }
+  .hint, .status, .warning, .error { margin-top: 9px; font-size: .91rem; }
+  .hint, .status { color: var(--muted); }
+  .warning { color: #704400; }
+  .error { color: #982e27; font-weight: 650; }
+  .hint:empty, .status:empty, .warning:empty, .error:empty { display: none; }
+  .result { border-top: 1px solid var(--line); margin-top: 19px; padding-top: 16px; min-width: 0; }
+  .result-header { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .result-header .actions { margin-top: 0; }
+  .scroll-table { max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 9px; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: .9rem; }
+  th, td { padding: 9px 11px; text-align: right; border-bottom: 1px solid #dce7ed; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { background: #eaf3f7; color: #173a51; }
+  tbody tr:nth-child(even) td { background: #f7fafb; }
+  tbody tr:last-child td, tbody tr:last-child th { border-bottom: 0; }
+  .negative { color: #9d2c22; font-weight: 700; }
+  .positive { color: #006867; font-weight: 700; }
+  .balanced { color: #3d5367; font-weight: 700; }
+  .panel summary { cursor: pointer; padding-block: 10px; min-height: 44px; }
+  .copy-fallback { width: 100%; min-height: 7rem; margin-top: 8px; font: .9rem/1.5 var(--number); }
+  footer { border-top: 1px solid var(--line); padding-block: 19px 28px; color: var(--muted); font-size: .9rem; }
+  footer a { color: var(--teal-dark); }
+  footer details { margin-top: 6px; }
+  footer summary { cursor: pointer; min-height: 44px; padding: 10px 0; }
+  [hidden] { display: none !important; }
+  @media (max-width: 640px) {
+    .wrap { width: calc(100% - 28px); }
+    .hero { padding: 25px 0; }
+    .hero-layout { grid-template-columns: 1fr; gap: 16px; }
+    .jump .wrap { gap: 0 14px; }
+    .jump a { font-size: .88rem; }
+    th, td { padding: 8px; }
+  }
+  @media (max-width: 420px) {
+    .base-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap hero-layout">
+    <div>
+      <p class="course">지구과학 주제 탐구</p>
+      <h1>해수 밀도 탐구실</h1>
+      <p class="intro">TEOS-10으로 수온과 염분에 따른 해수 밀도 변화를 계산합니다.</p>
+    </div>
+    <div class="readout">
+      <p class="readout-label" id="density-label">초기 해수 밀도 ρ</p>
+      <output id="initial-density" for="base-ct base-sa base-p" aria-labelledby="density-label">—</output>
+      <p class="readout-unit">kg/m³</p>
+    </div>
+  </div>
+</header>
+<nav class="jump" aria-label="탐구 기능 이동">
+  <div class="wrap">
+    <a href="#baseline">초기 조건</a>
+    <a href="#change">A. 밀도 변화</a>
+    <a href="#balance">B. 밀도 유지</a>
+    <a href="#boundaries">C. 경계 조건</a>
+  </div>
+</nav>
+<main class="wrap">
+  <noscript><p class="error">계산하려면 브라우저에서 JavaScript를 켠 상태로 이 페이지를 열어 주세요.</p></noscript>
+  <p class="error" id="engine-error" role="alert">계산 기능을 불러오는 중입니다. 이 메시지가 계속 표시되면 HTML 파일을 다시 열어 주세요.</p>
+
+  <section class="panel" id="baseline" aria-labelledby="base-title">
+    <h2 id="base-title">초기 조건</h2>
+    <div class="controls base-controls">
+      <label class="field" for="base-ct"><span>보존수온 CT <span class="unit">℃</span></span>
+        <input id="base-ct" type="number" inputmode="decimal" min="-2.5" max="40" step="any" value="15">
+      </label>
+      <label class="field" for="base-sa"><span>절대염분 SA <span class="unit">g/kg</span></span>
+        <input id="base-sa" type="number" inputmode="decimal" min="0" max="50" step="any" value="35">
+      </label>
+      <label class="field" for="base-p"><span>해수 압력 p <span class="unit">dbar</span></span>
+        <input id="base-p" type="number" inputmode="decimal" min="0" max="10000" step="any" value="0">
+      </label>
+    </div>
+    <p class="hint">CT −2.5~40 ℃ · SA 0~50 g/kg · p 0~10,000 dbar. 모든 비교에서 압력을 고정합니다.</p>
+    <p class="error" id="base-error" role="alert"></p>
+  </section>
+
+  <section class="panel" id="change" aria-labelledby="change-title">
+    <div class="section-title"><span class="section-letter" aria-hidden="true">A</span><h2 id="change-title">수온·염분 증가에 따른 밀도 변화</h2></div>
+    <form id="single-form" novalidate>
+      <div class="controls two-inputs">
+        <label class="field" for="change-ct"><span>수온 상승량 ΔT <span class="unit">℃</span></span>
+          <input id="change-ct" type="number" inputmode="decimal" min="0" step="any" value="1">
+        </label>
+        <label class="field" for="change-sa"><span>염분 증가량 ΔSA <span class="unit">g/kg</span></span>
+          <input id="change-sa" type="number" inputmode="decimal" min="0" step="any" value="0.2">
+        </label>
+      </div>
+      <div class="actions">
+        <button type="submit" data-calc disabled>입력 조건 계산</button>
+        <button type="button" class="alt" id="run-grid" data-calc disabled>25가지 조건 계산</button>
+      </div>
+    </form>
+    <p class="hint">Δρ = 변경 후 밀도 − 초기 밀도. |Δρ| ≤ 0.000001 kg/m³이면 거의 상쇄로 판정합니다.</p>
+    <p class="error" id="single-error" role="alert"></p>
+    <div id="single-result"></div>
+    <p class="status" id="grid-status" role="status"></p>
+    <p class="error" id="grid-error" role="alert"></p>
+    <div id="grid-result"></div>
+  </section>
+
+  <section class="panel" id="balance" aria-labelledby="balance-title">
+    <div class="section-title"><span class="section-letter" aria-hidden="true">B</span><h2 id="balance-title">이진 탐색으로 밀도 유지</h2></div>
+    <form id="balance-form" novalidate>
+      <div class="controls one-input">
+        <label class="field" for="balance-ct"><span>수온 상승량 ΔT <span class="unit">℃</span></span>
+          <input id="balance-ct" type="number" inputmode="decimal" min="0" step="any" value="1">
+        </label>
+      </div>
+      <div class="actions"><button type="submit" data-calc disabled>필요한 염분 증가량 찾기</button></div>
+    </form>
+    <p class="hint">ΔSA 0~1 g/kg에서 시작해 필요하면 상한을 두 배씩 늘립니다. 최종 SA는 50 g/kg 이하이며, 허용 밀도 오차는 0.000001 kg/m³, 이진 탐색 상한은 80회입니다.</p>
+    <p class="error" id="balance-error" role="alert"></p>
+    <p class="status" id="balance-status" role="status"></p>
+    <div id="balance-result" aria-live="polite"></div>
+  </section>
+
+  <section class="panel" id="boundaries" aria-labelledby="boundaries-title">
+    <div class="section-title"><span class="section-letter" aria-hidden="true">C</span><h2 id="boundaries-title">수온 상승량별 경계 조건</h2></div>
+    <p class="hint">같은 초기 조건에서 +1 ℃부터 +5 ℃까지 밀도를 유지하는 염분 증가량을 구합니다. 복사와 CSV에는 염분을 소수점 아래 9자리까지 담습니다.</p>
+    <div class="actions"><button type="button" id="run-boundaries" data-calc disabled>5가지 경계 조건 계산</button></div>
+    <p class="error" id="boundaries-error" role="alert"></p>
+    <p class="status" id="boundaries-status" role="status"></p>
+    <div id="boundaries-result"></div>
+  </section>
+</main>
+<footer>
+  <div class="wrap">
+    <p>TEOS-10 GSW의 75항 비체적 다항식으로 v를 계산하고 ρ = 1/v를 적용합니다. <a href="https://www.teos-10.org/pubs/gsw/html/gsw_rho.html">공식 문서</a> · <a href="https://github.com/TEOS-10/GSW-C">GSW-C 소스</a></p>
+    <details>
+      <summary>계산 범위와 공식 예제 확인</summary>
+      <p>TEOS-10의 해양 적용 권장 범위(oceanographic funnel)를 벗어나는 조건은 공식 다항식의 정확도가 낮아질 수 있습니다. 수온 상승이 밀도를 낮추고 염분 증가가 밀도를 높이는 조건에서 Δρ 부호로 두 효과의 우세를 해석할 수 있습니다.</p>
+      <p class="status" id="self-check"></p>
+    </details>
+  </div>
+</footer>
+<script>
+"use strict";
+
+/*
+Licence for the use of the Gibbs SeaWater (GSW) Oceanographic Toolbox
+
+Copyright (c) 2011, SCOR/IAPSO WG127 (Scientific Committee on Oceanic Research/
+International Association for the Physical Sciences of the Oceans, Working Group 127).
+
+All rights reserved.
+
+Redistribution and use, in source and binary forms, without modification, is permitted
+provided that the following conditions are met:
+
+• Redistributions of source code must retain the above copyright notice, this list
+  of conditions and the following disclaimer.
+
+• Redistributions in binary form must reproduce the above copyright notice, this
+  list of conditions and the following disclaimer in the documentation and/or other
+  materials provided with the distribution.
+
+• Neither the name of SCOR/IAPSO WG127 nor the names of its contributors may be used
+  to endorse or promote products derived from this software without specific prior
+  written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
+EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT
+SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+DAMAGE.
+
+The software is available from http://www.TEOS-10.org
+
+*/
+// TEOS-10 GSW 75-term specific-volume fit (Roquet et al., 2015).
+// Numeric coefficients: SCOR/IAPSO WG127, GSW-C gsw_internal_const.h.
+// https://github.com/TEOS-10/GSW-C/blob/db75c391137173a0e121166e787fcc15fc3c3e7f/gsw_internal_const.h#L297-L371
+// Indices are the powers of scaled pressure z, temperature y, and salinity x.
+const SPECVOL_COEFFICIENTS = [
+  [ // z^0
+    [1.0769995862e-3, -3.1038981976e-4, 6.6928067038e-4, -8.5047933937e-4, 5.8086069943e-4, -2.1092370507e-4, 3.1932457305e-5],
+    [-1.5649734675e-5, 3.5009599764e-5, -4.3592678561e-5, 3.4532461828e-5, -1.1959409788e-5, 1.3864594581e-6],
+    [2.7762106484e-5, -3.7435842344e-5, 3.5907822760e-5, -1.8698584187e-5, 3.8595339244e-6],
+    [-1.6521159259e-5, 2.4141479483e-5, -1.4353633048e-5, 2.2863324556e-6],
+    [6.9111322702e-6, -8.7595873154e-6, 4.3703680598e-6],
+    [-8.0539615540e-7, -3.3052758900e-7],
+    [2.0543094268e-7],
+  ],
+  [ // z^1
+    [-6.0799143809e-5, 2.4262468747e-5, -3.4792460974e-5, 3.7470777305e-5, -1.7322218612e-5, 3.0927427253e-6],
+    [1.8505765429e-5, -9.5677088156e-6, 1.1100834765e-5, -9.8447117844e-6, 2.5909225260e-6],
+    [-1.1716606853e-5, -2.3678308361e-7, 2.9283346295e-6, -4.8826139200e-7],
+    [7.9279656173e-6, -3.4558773655e-6, 3.1655306078e-7],
+    [-3.4102187482e-6, 1.2956717783e-6],
+    [5.0736766814e-7],
+  ],
+  [ // z^2
+    [9.9856169219e-6, -5.8484432984e-7, -4.8122251597e-6, 4.9263106998e-6, -1.7811974727e-6],
+    [-1.1736386731e-6, -5.5699154557e-6, 5.4620748834e-6, -1.3544185627e-6],
+    [2.1305028740e-6, 3.9137387080e-7, -6.5731104067e-7],
+    [-4.6132540037e-7, 7.7618888092e-9],
+    [-6.3352916514e-8],
+  ],
+  [ // z^3
+    [-1.1309361437e-6, 3.6310188515e-7, 1.6746303780e-8],
+    [-3.6527006553e-7, -2.7295696237e-7],
+    [2.8695905159e-7],
+  ],
+  [ // z^4
+    [1.0531153080e-7, -1.1147125423e-7],
+    [3.1454099902e-7],
+  ],
+  [ // z^5
+    [-1.2647261286e-8],
+  ],
+  [ // z^6
+    [1.9613503930e-9],
+  ],
+];
+
+// SA in g/kg, CT in °C, and sea pressure in dbar. Returns kg/m³.
+function gswRho(sa, ct, p) {
+  const x = Math.sqrt(0.0248826675584615 * sa + 5.971840214030754e-1);
+  const y = ct * 0.025;
+  const z = p * 1e-4;
+
+  // Evaluate the polynomial in nested Horner form, from high to low powers.
+  let specificVolume = 0;
+  for (let k = SPECVOL_COEFFICIENTS.length - 1; k >= 0; k -= 1) {
+    const temperatureRows = SPECVOL_COEFFICIENTS[k];
+    let pressureCoefficient = 0;
+    for (let i = temperatureRows.length - 1; i >= 0; i -= 1) {
+      const salinityRow = temperatureRows[i];
+      let temperatureCoefficient = 0;
+      for (let j = salinityRow.length - 1; j >= 0; j -= 1) {
+        temperatureCoefficient = salinityRow[j] + x * temperatureCoefficient;
+      }
+      pressureCoefficient = temperatureCoefficient + y * pressureCoefficient;
+    }
+    specificVolume = pressureCoefficient + z * specificVolume;
+  }
+  return 1 / specificVolume;
+}
+/* Find the added salinity that restores the original density at fixed pressure. */
+const DENSITY_TOLERANCE = 0.000001;
+const MAX_BISECTION_ITERATIONS = 80;
+const MAX_SEARCH_SALINITY = 50;
+
+function solveDensity(base, deltaCT) {
+  const ct = base.ct + deltaCT;
+  if (!Number.isFinite(deltaCT) || deltaCT < 0 || !Number.isFinite(ct)) {
+    throw new Error('수온 상승량에 0 이상의 유한한 수를 입력하세요.');
+  }
+  if (!Number.isFinite(base.rho) || !Number.isFinite(base.p) ||
+      !Number.isFinite(base.sa) || base.sa < 0 || base.sa > MAX_SEARCH_SALINITY) {
+    throw new Error('이진 탐색에 사용할 초기 조건을 확인하세요.');
+  }
+
+  const trace = [];
+  let expansions = 0;
+
+  function sample(deltaSA) {
+    const sa = base.sa + deltaSA;
+    const rho = gswRho(sa, ct, base.p);
+    if (!Number.isFinite(rho) || rho <= 0) {
+      throw new Error('해수 밀도를 계산할 수 없습니다. 입력 조건을 확인하세요.');
+    }
+    return { deltaSA, sa, rho, error: rho - base.rho };
+  }
+
+  function result(point, message) {
+    return {
+      converged: point !== null,
+      deltaCT,
+      ct,
+      deltaSA: point?.deltaSA ?? null,
+      sa: point?.sa ?? null,
+      rho: point?.rho ?? null,
+      error: point?.error ?? null,
+      iterations: trace.length,
+      trace,
+      expansions,
+      message,
+    };
+  }
+
+  const low = sample(0);
+  if (Math.abs(low.error) <= DENSITY_TOLERANCE) {
+    return result(low, '염분 증가량이 0일 때 이미 허용 오차 이내입니다.');
+  }
+  if (low.error > 0) {
+    return result(null, '염분을 늘리기 전의 밀도가 이미 초기 밀도보다 높습니다. 염분을 늘리는 조건에서는 초기 밀도를 회복할 수 없습니다.');
+  }
+
+  const limit = MAX_SEARCH_SALINITY - base.sa;
+  let min = 0;
+  let max = Math.min(1, limit);
+  let high = sample(max);
+  while (high.error < -DENSITY_TOLERANCE && max < limit) {
+    max = Math.min(max * 2, limit);
+    high = sample(max);
+    expansions += 1;
+  }
+  if (Math.abs(high.error) <= DENSITY_TOLERANCE) {
+    return result(high, '탐색 범위의 최댓값에서 허용 오차를 충족했습니다.');
+  }
+  if (high.error < 0) {
+    return result(null, `최종 절대염분 ${MAX_SEARCH_SALINITY} g/kg까지 염분을 늘려도 초기 밀도에 도달하지 못했습니다.`);
+  }
+
+  for (let iteration = 1; iteration <= MAX_BISECTION_ITERATIONS; iteration += 1) {
+    const mid = (min + max) / 2;
+    const point = sample(mid);
+    const accepted = Math.abs(point.error) <= DENSITY_TOLERANCE;
+    const stationary = mid === min || mid === max;
+    let direction;
+    if (accepted) {
+      direction = '허용 오차 이내';
+    } else if (stationary) {
+      direction = '수치 정밀도 한계';
+    } else if (point.error < 0) {
+      direction = '염분 증가량 늘리기';
+    } else {
+      direction = '염분 증가량 줄이기';
+    }
+    trace.push({ iteration, min, max, mid, rho: point.rho, error: point.error, direction });
+    if (accepted) {
+      return result(point, '');
+    }
+    if (stationary) {
+      return result(null, '수치 정밀도 한계에 도달해 허용 오차를 충족하지 못했습니다.');
+    }
+    if (point.error < 0) {
+      min = mid;
+    } else {
+      max = mid;
+    }
+  }
+
+  return result(null, `최대 ${MAX_BISECTION_ITERATIONS}회 안에 허용 오차를 충족하지 못했습니다.`);
+}
+
+const OFFICIAL_EXAMPLES = [
+  [34.7118, 28.8099, 10, 1021.839935738108],
+  [34.8915, 28.4392, 50, 1022.262457966867],
+  [35.0256, 22.7862, 125, 1024.427195413316],
+  [34.8472, 10.2262, 250, 1027.790152759127],
+  [34.7366, 6.8272, 600, 1029.837779000189],
+  [34.7324, 4.3236, 1000, 1032.002453224572],
+];
+const TEMPERATURE_STEPS = [1, 2, 3, 4, 5];
+const SALINITY_STEPS = [0.2, 0.4, 0.6, 0.8, 1.0];
+const BALANCE_BAND = 0.000001;
+const $ = (id) => document.getElementById(id);
+
+function fixed(value, places = 6) {
+  const display = value.toFixed(places);
+  return Number(display) === 0 ? (0).toFixed(places) : display;
+}
+
+function signed(value, places = 6) {
+  const display = fixed(value, places);
+  return Number(display) > 0 ? '+' + display : display;
+}
+
+function short(value) {
+  return value.toLocaleString('en-US', { useGrouping: false, maximumFractionDigits: 9 });
+}
+
+function readNumber(id, label, min, max = Infinity) {
+  const field = $(id);
+  const value = field.valueAsNumber;
+  field.removeAttribute('aria-invalid');
+  if (!Number.isFinite(value) || value < min || value > max) {
+    field.setAttribute('aria-invalid', 'true');
+    const range = max === Infinity ? `${min} 이상의` : `${min}~${max} 범위의`;
+    throw new Error(`${label}에 ${range} 수를 입력하세요.`);
+  }
+  return value;
+}
+
+function density(sa, ct, p) {
+  const rho = gswRho(sa, ct, p);
+  if (!Number.isFinite(rho) || rho <= 0) {
+    throw new Error('해수 밀도를 계산할 수 없습니다. 입력 조건을 확인하세요.');
+  }
+  return rho;
+}
+
+function readBase() {
+  const ct = readNumber('base-ct', '보존수온', -2.5, 40);
+  const sa = readNumber('base-sa', '절대염분', 0, MAX_SEARCH_SALINITY);
+  const p = readNumber('base-p', '해수 압력', 0, 10000);
+  return { ct, sa, p, rho: density(sa, ct, p) };
+}
+
+function updateBase() {
+  $('base-error').textContent = '';
+  try {
+    $('initial-density').value = fixed(readBase().rho);
+  } catch (error) {
+    $('initial-density').value = '—';
+    $('base-error').textContent = error.message;
+  }
+}
+
+function clearResult(key) {
+  $(key + '-result').replaceChildren();
+  $(key + '-error').textContent = '';
+  const status = $(key + '-status');
+  if (status) status.textContent = '';
+}
+
+function compute(key, operation) {
+  clearResult(key);
+  try {
+    operation(readBase(), $(key + '-result'));
+  } catch (error) {
+    $(key + '-result').replaceChildren();
+    const status = $(key + '-status');
+    if (status) status.textContent = '';
+    $(key + '-error').textContent = error.message || '계산 중 오류가 발생했습니다.';
+  }
+}
+
+function applyChanges(base, deltaCT, deltaSA) {
+  const ct = base.ct + deltaCT;
+  const sa = base.sa + deltaSA;
+  if (ct > 40) return { message: '변경 후 CT가 40 ℃를 초과합니다.' };
+  if (sa > MAX_SEARCH_SALINITY) return { message: '변경 후 SA가 50 g/kg을 초과합니다.' };
+  const rho = density(sa, ct, base.p);
+  const difference = rho - base.rho;
+  const warmedDensity = density(base.sa, ct, base.p);
+  const opposed = warmedDensity <= base.rho && rho >= warmedDensity;
+  if (Math.abs(difference) <= BALANCE_BAND) {
+    return { ct, sa, rho, difference, opposed, tone: 'balanced', label: '거의 상쇄' };
+  }
+  return difference < 0
+    ? { ct, sa, rho, difference, opposed, tone: 'negative', label: '수온 상승 효과 우세' }
+    : { ct, sa, rho, difference, opposed, tone: 'positive', label: '염분 증가 효과 우세' };
+}
+
+function balanceCondition(base, deltaCT) {
+  if (base.ct + deltaCT > 40) {
+    return { converged: false, message: '변경 후 CT가 40 ℃를 초과합니다.', trace: [], expansions: 0 };
+  }
+  return solveDensity(base, deltaCT);
+}
+
+function element(tag, className, content) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (content !== undefined) node.textContent = content;
+  return node;
+}
+
+function copyTable(text, status, fallback, button) {
+  fallback.hidden = true;
+  const manual = () => {
+    fallback.value = text;
+    fallback.hidden = false;
+    fallback.focus();
+    fallback.select();
+    fallback.setSelectionRange(0, fallback.value.length);
+    let copied = false;
+    try {
+      copied = document.execCommand('copy');
+    } catch {
+      // Leave the selected text available for the device's Copy command.
+    }
+    status.textContent = copied ? '표를 복사했습니다.' : '선택된 표를 길게 눌러 복사하세요.';
+    fallback.hidden = copied;
+    if (copied) button.focus();
+  };
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(() => {
+      status.textContent = '표를 복사했습니다.';
+    }).catch(manual);
+  } else {
+    manual();
+  }
+}
+
+function downloadTable(rows, filename) {
+  const contents = rows.map((row) => row.map((cell) => '"' + cell.replaceAll('"', '""') + '"').join(',')).join('\r\n');
+  const url = URL.createObjectURL(new Blob(['\uFEFF', contents], { type: 'text/csv;charset=utf-8' }));
+  const link = element('a');
+  link.href = url;
+  link.download = filename + '.csv';
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+
+function resultTable(parent, title, filename, headers, rows, rowHeaders = false) {
+  const group = element('div', 'result');
+  const groupHeader = element('div', 'result-header');
+  const heading = element('h3', '', title);
+  heading.id = filename + '-title';
+  const actions = element('div', 'actions');
+  const copy = element('button', 'alt', '표 복사');
+  const save = element('button', 'alt', 'CSV 저장');
+  copy.type = save.type = 'button';
+  copy.setAttribute('aria-label', title + ' 표 복사');
+  save.setAttribute('aria-label', title + ' CSV 저장');
+  actions.append(copy, save);
+  groupHeader.append(heading, actions);
+
+  const container = element('div', 'scroll-table');
+  container.tabIndex = 0;
+  container.setAttribute('role', 'region');
+  container.setAttribute('aria-labelledby', heading.id);
+  const table = element('table');
+  const headerRow = table.createTHead().insertRow();
+  for (const header of headers) {
+    const cell = element('th', '', header);
+    cell.scope = 'col';
+    headerRow.append(cell);
+  }
+  const body = table.createTBody();
+  const exportRows = [headers];
+  for (const row of rows) {
+    const tr = body.insertRow();
+    const exportRow = [];
+    row.forEach((entry, index) => {
+      const data = typeof entry === 'object' ? entry : { text: String(entry) };
+      const isRowHeader = rowHeaders && index === 0;
+      const cell = element(isRowHeader ? 'th' : 'td', data.tone, data.text);
+      if (isRowHeader) cell.scope = 'row';
+      if (data.title) cell.title = data.title;
+      tr.append(cell);
+      exportRow.push(data.exportText ?? data.text);
+    });
+    exportRows.push(exportRow);
+  }
+  const feedback = element('p', 'status');
+  feedback.setAttribute('role', 'status');
+  const fallback = element('textarea', 'copy-fallback');
+  fallback.readOnly = true;
+  fallback.hidden = true;
+  fallback.setAttribute('aria-label', title + ' 복사용 텍스트');
+  copy.addEventListener('click', () => copyTable(exportRows.map((row) => row.join('\t')).join('\n'), feedback, fallback, copy));
+  save.addEventListener('click', () => downloadTable(exportRows, filename));
+  container.append(table);
+  group.append(groupHeader, container, feedback, fallback);
+  parent.append(group);
+}
+
+const changeHeaders = [
+  'ΔT (℃)', 'ΔSA (g/kg)', '변경 후 CT (℃)', '변경 후 SA (g/kg)',
+  '초기 ρ (kg/m³)', '변경 후 ρ (kg/m³)', 'Δρ (kg/m³)', '효과 판정',
+];
+
+function changeRow(base, deltaCT, deltaSA, result) {
+  const prefix = ['+' + short(deltaCT), '+' + short(deltaSA)];
+  if (result.message) return [...prefix, '—', '—', fixed(base.rho), '—', '—', result.message];
+  return [
+    ...prefix, short(result.ct), short(result.sa), fixed(base.rho), fixed(result.rho),
+    { text: signed(result.difference), tone: result.tone },
+    { text: result.opposed ? result.label : '우세 판정 제외', tone: result.tone },
+  ];
+}
+
+function renderSingle(base, parent) {
+  const deltaCT = readNumber('change-ct', '수온 상승량', 0);
+  const deltaSA = readNumber('change-sa', '염분 증가량', 0);
+  const result = applyChanges(base, deltaCT, deltaSA);
+  if (result.message) throw new Error(result.message);
+  resultTable(parent, '입력 조건 결과', 'earth-single', changeHeaders, [changeRow(base, deltaCT, deltaSA, result)]);
+  if (!result.opposed) {
+    parent.append(element('p', 'warning', '이 조건에서는 수온과 염분의 밀도 효과가 서로 반대라는 전제가 성립하지 않아 우세 판정을 생략했습니다.'));
+  }
+}
+
+function renderGrid(base, parent) {
+  const detailRows = [];
+  let unavailable = 0;
+  let anomalous = false;
+  const rows = TEMPERATURE_STEPS.map((deltaCT) => [
+    '+' + deltaCT,
+    ...SALINITY_STEPS.map((deltaSA) => {
+      const result = applyChanges(base, deltaCT, deltaSA);
+      detailRows.push(changeRow(base, deltaCT, deltaSA, result));
+      if (result.message) {
+        unavailable += 1;
+        return { text: '—', title: result.message };
+      }
+      if (!result.opposed) anomalous = true;
+      return { text: signed(result.difference), tone: result.tone };
+    }),
+  ]);
+  const summary = [];
+  if (unavailable) summary.push(`${unavailable}개 조건이 입력 범위를 벗어났습니다. 자세한 사유는 상세 결과에 표시됩니다.`);
+  if (anomalous) summary.push('수온과 염분의 효과가 서로 반대라는 전제가 성립하지 않는 조건은 상세 결과에서 우세 판정을 제외했습니다.');
+  $('grid-status').textContent = summary.join(' ');
+  resultTable(parent, '25가지 밀도 변화량 Δρ (kg/m³)', 'earth-grid',
+    ['ΔT (℃) / ΔSA (g/kg)', ...SALINITY_STEPS.map((step) => '+' + step.toFixed(1))], rows, true);
+  const detail = element('details');
+  detail.append(element('summary', 'hint', '25가지 조건 상세 결과 펼치기'));
+  resultTable(detail, '25가지 조건 상세 결과', 'earth-grid-detail', changeHeaders, detailRows);
+  parent.append(detail);
+}
+
+const salinityResult = (value) => ({ text: fixed(value), exportText: fixed(value, 9) });
+const errorResult = (value) => ({ text: signed(value, 9), exportText: signed(value, 12) });
+
+function renderBalance(base, parent) {
+  const deltaCT = readNumber('balance-ct', '수온 상승량', 0);
+  const result = balanceCondition(base, deltaCT);
+  if (!result.converged) $('balance-error').textContent = result.message;
+  const notes = [];
+  if (result.expansions) notes.push(`탐색 상한을 ${result.expansions}회 확장했습니다.`);
+  if (result.converged && result.message) notes.push(result.message);
+  $('balance-status').textContent = notes.join(' ');
+  if (result.converged) {
+    resultTable(parent, '밀도 유지 조건', 'earth-balance', [
+      'ΔT (℃)', '필요 ΔSA (g/kg)', '최종 SA (g/kg)', '조정 후 ρ (kg/m³)', '밀도 오차 (kg/m³)', '이진 탐색 횟수',
+    ], [[
+      '+' + short(deltaCT), salinityResult(result.deltaSA), salinityResult(result.sa),
+      fixed(result.rho), errorResult(result.error), result.iterations,
+    ]]);
+  }
+  if (result.trace.length) {
+    resultTable(parent, '이진 탐색 과정', 'earth-iterations', [
+      '반복', '최소 ΔSA (g/kg)', '최대 ΔSA (g/kg)', '중간 ΔSA (g/kg)', '밀도 (kg/m³)',
+      '밀도 오차 (kg/m³)', '다음 탐색 방향',
+    ], result.trace.map((step) => [
+      step.iteration, salinityResult(step.min), salinityResult(step.max), salinityResult(step.mid), fixed(step.rho),
+      errorResult(step.error), step.direction,
+    ]), true);
+  }
+}
+
+function renderBoundaries(base, parent) {
+  const failures = [];
+  const rows = TEMPERATURE_STEPS.map((deltaCT) => {
+    const result = balanceCondition(base, deltaCT);
+    if (!result.converged) {
+      failures.push(`+${deltaCT} ℃: ${result.message}`);
+      return ['+' + deltaCT, '—', '—', '—'];
+    }
+    return ['+' + deltaCT, salinityResult(result.deltaSA), salinityResult(result.sa), errorResult(result.error)];
+  });
+  $('boundaries-status').textContent = failures.join(' ');
+  resultTable(parent, '수온별 밀도 유지 조건', 'earth-boundaries', [
+    '수온 상승량 (℃)', '필요한 염분 증가량 (g/kg)', '최종 염분 (g/kg)', '밀도 오차 (kg/m³)',
+  ], rows, true);
+}
+
+function initialize() {
+  const exampleErrors = OFFICIAL_EXAMPLES.map(([sa, ct, p, expected]) => Math.abs(density(sa, ct, p) - expected));
+  const maximumError = Math.max(...exampleErrors);
+  if (maximumError > 1e-9) throw new Error('공식 예제와 일치하지 않아 계산을 중단했습니다.');
+  $('self-check').textContent = `시작 시 공식 문서 예제 ${exampleErrors.length}개를 비교했습니다. 최대 절대 차이는 ${maximumError.toExponential(2)} kg/m³입니다.`;
+
+  for (const id of ['base-ct', 'base-sa', 'base-p']) {
+    $(id).addEventListener('input', () => {
+      for (const key of ['single', 'grid', 'balance', 'boundaries']) clearResult(key);
+      updateBase();
+    });
+  }
+  for (const [id, key] of [['change-ct', 'single'], ['change-sa', 'single'], ['balance-ct', 'balance']]) {
+    $(id).addEventListener('input', () => {
+      $(id).removeAttribute('aria-invalid');
+      clearResult(key);
+    });
+  }
+  $('single-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    compute('single', renderSingle);
+  });
+  $('run-grid').addEventListener('click', () => compute('grid', renderGrid));
+  $('balance-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    compute('balance', renderBalance);
+  });
+  $('run-boundaries').addEventListener('click', () => compute('boundaries', renderBoundaries));
+  updateBase();
+  $('engine-error').hidden = true;
+  for (const button of document.querySelectorAll('[data-calc]')) button.disabled = false;
+}
+
+try {
+  initialize();
+} catch (error) {
+  $('engine-error').textContent = 'TEOS-10 계산 기능을 시작할 수 없습니다. ' + error.message;
+}
+</script>
+</body>
+</html>
